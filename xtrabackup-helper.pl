@@ -7,6 +7,8 @@ use 5.10.00;
 use Data::Dumper;
 use Getopt::Long;
 use File::Basename;
+use Cwd 'abs_path';
+use File::Temp;
 
 my $dir = '/var/backups/mysql/data';
 my $mode = 'list';
@@ -16,11 +18,14 @@ my $chown;
 my $force = 0;
 my $full_day = 1;
 
+my $update_url = 'https://raw.github.com/hoegaarden/xtrabackup-helper/master/xtrabackup-helper.pl';
+
 my %modes = (
     'list'    => \&doList ,
     'restore' => \&doRestore ,
     'backup'  => \&doBackup ,
-    'wedge'   => \&wedge
+    'wedge'   => \&doWedge ,
+    'update'  => \&doUpdate
 );
 
 
@@ -56,8 +61,23 @@ sub handleCmdline {
     }
 }
 
-sub wedge {
+sub doWedge {
     die 'not implemented';
+}
+
+sub doUpdate {
+    # perhaps not the safest way ...
+
+    my $bin_path = abs_path($0);
+    my $tmp = tmpnam();
+    
+    execCmd('wget', '-O', $tmp, $update_url);
+    execCmd('mv', $bin_path, $bin_path.'.bak');
+    execCmd('mv', $tmp, $bin_path);
+    execCmd('chmod', '+x', $bin_path);
+
+    say(' ** Update complete ** ');
+    exit;
 }
 
 sub doBackup {
