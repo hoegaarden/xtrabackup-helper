@@ -16,6 +16,9 @@ use File::Basename;
 use Cwd 'abs_path';
 use File::Temp;
 
+use constant TFULL => 'full-backuped';
+use constant TINC => 'incremental';
+
 my $dir = '/var/backups/mysql/data';
 my $mode = 'list';
 my $restore;
@@ -263,7 +266,7 @@ sub doBackup {
         $make_full = 1;
     } else {
         my @full = grep {
-            $_->[1] eq 'full-backuped'
+            $_->[1] eq TFULL
         } @{ getBackupList() };
 	
         if (scalar @full < 1) {
@@ -331,7 +334,17 @@ sub readFile {
 }
 
 sub getBackupList {
-    my @backups;
+    #
+    # Why so complicated with the linked list and all the stuff?
+    #
+    # Just so we can be kind of sure to have a valid chain of
+    # inc_backup <- inc_backup <- ... <- full_backup
+    # and we don't prepare a inc_backup on top of a wrong/invalid parent
+    #
+
+    my %heads;
+    my @incs;
+    my @others;
 
     my $pattern = $dir . '/*/xtrabackup_checkpoints';
     my @list = glob($pattern);
@@ -341,15 +354,68 @@ sub getBackupList {
         my $id = basename(dirname($_));
 
         if ( $cont =~ m/^backup_type\s*=\s*([^\s]+)$/mg ) {
-            push(@backups, [$id, $1]);
+            my $type = $1;
+
+            my ($from) = $cont =~ m/^from_lsn\s*=\s*(\d+)$/mg ;
+            my ($to)   = $cont =~ m/^to_lsn\s*=\s*(\d+)$/mg ;
+
+            my $backup = {
+                id => $id, type => $type
+              , from => $from, to => $to
+              , parent => undef
+            };
+
+            if ($type eq TFULL) {
+                $heads{ $to } =  $backup;
+            } elsif ($type eq TINC) {
+                push(@incs, $backup);
+            } else {
+                $backup->{'__unused'} = 'no valid type';
+                push(@others, $backup);
+            }
         }
     }
 
-    @backups = sort {
-        id2Norm($a->[0]) <=> id2Norm($b->[0])
-    } @backups;
+    # build the linked list
+    foreach my $backup (@incs) {
+        my $from = $backup->{from};
+        my $to   = $backup->{to};
 
-    return \@backups;
+        unless (defined($heads{$from})) {
+            $backup->{'__unused'} = 'no valid base found (LSN)';
+            push(@others, $backup);
+            next;
+        }
+
+        my $parent = $heads{$from};
+
+        $backup->{'parent'} = $parent;
+        $heads{$to} = $backup;
+
+        if ($to != $from) {
+            delete $heads{$from};
+        }
+    }
+
+    my @backups;
+
+    # build the flat list from the linked list
+    foreach my $head (sort keys %heads) {
+        my $cur = $heads{$head};
+        my @tmp;
+
+        do {
+            push( @tmp, [$cur->{id}, $cur->{type}] );
+        } while ( defined($cur->{parent}) && ($cur = $cur->{parent}) );
+
+        push( @backups , reverse @tmp );
+    }
+
+    foreach (@others) {
+        push( @backups , [$_->{id}, $_->{type}] );
+    }
+
+    return \@backups ;
 }
 
 sub doList {
@@ -361,12 +427,12 @@ sub doList {
     	my $id = $_->[0];
     	my $type = $_->[1];
 
-    	if ($type eq 'incremental') {
+    	if ($type eq TINC) {
     	    say $indent . $id;
     	    next;
     	}
 
-    	if ($type eq 'full-backuped') {
+    	if ($type eq TFULL) {
     	    say "\n" . $id;
     	    next;
     	}
@@ -404,7 +470,7 @@ sub doRestore() {
     	
     	last if (id2Norm($id) > id2Norm($target));
     	
-    	if ($type eq 'full-backuped') {
+    	if ($type eq TFULL) {
     	    @restore_list = ();
     	}
     	
