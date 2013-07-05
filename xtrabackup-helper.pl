@@ -24,6 +24,7 @@ my $chown;
 my $force = 0;
 my $full_day = 1;
 my $show_man = 0;
+my $keep_days = 7;
 
 my $update_url = 'https://raw.github.com/hoegaarden/xtrabackup-helper/master/xtrabackup-helper.pl';
 
@@ -73,7 +74,7 @@ The current day of week (determined by C<date '+%u'>) is the same as the one giv
 
 The script loads the newest version of itself from github and replaces itself
 
-=item C<wedge>
+=item C<weedout>
 
 I<not implemented yet>
 
@@ -85,7 +86,7 @@ my %modes = (
     'list'    => \&doList ,
     'restore' => \&doRestore ,
     'backup'  => \&doBackup ,
-    'wedge'   => \&doWedge ,
+    'weedout' => \&doWeedout ,
     'update'  => \&doUpdate
 );
 
@@ -95,8 +96,8 @@ handleCmdline();
 
 # call the function
 $modes{ $mode }->();
-
 exit;
+
 
 =head1 OPTIONS
 
@@ -138,6 +139,12 @@ The day of week when a full backup should be made. Defaults to 1 which means mon
 
 Displays this help /  manpage.
 
+=item C<--keep-days>, C<-k>
+
+This is the minimum of days in the past where it's possible to restore a backup from. defaults to 7.
+This means, that e.g. full backups can be older than this setting, because an incremental backup, which
+is younger is based on that full backup.
+
 =back
 
 
@@ -147,14 +154,15 @@ Displays this help /  manpage.
 
 sub handleCmdline {
     GetOptions(
-        'mode|m=s'   => \$mode ,
-        'dir=s'      => \$dir ,
-        'restore=s'  => \$restore ,
-        'out=s'      => \$out ,
-        'chown=s'    => \$chown ,
-        'force|f!'   => \$force ,
-        'full-day=i' => \$full_day ,
-        'man|help!'  => \$show_man
+        'mode|m=s'    => \$mode ,
+        'dir=s'       => \$dir ,
+        'restore=s'   => \$restore ,
+        'out=s'       => \$out ,
+        'chown=s'     => \$chown ,
+        'force|f!'    => \$force ,
+        'full-day=i'  => \$full_day ,
+        'man|help!'   => \$show_man ,
+        'keep-days=i' => \$keep_days
     ) or die();
 
     if ($show_man) {
@@ -191,8 +199,42 @@ sub doShowMan {
     exit;
 }
 
-sub doWedge {
-    die 'not implemented';
+sub doWeedout {
+    if ( $keep_days < 1 ) {
+        die('keep-days must be a positiv integer');
+    }
+
+    my $target = `date -d '${keep_days} days ago' '+%Y-%m-%d_%H-%M-%S'`;
+    chomp($target);
+    my @list = @{ getBackupList() };
+
+    my @delete;
+    my $saw_full = 0;
+    my @tmp;
+
+    while (1) {
+        my $cur = shift(@list);
+
+        last unless defined($cur);
+
+        my $cur_id = $cur->[0];
+
+        last if (id2Norm($cur_id) > id2Norm($target));
+
+        if ($cur->[1] eq 'full-backedup') {
+            $saw_full = 1;
+            push(@delete, @tmp);
+            @tmp = ();
+        }
+
+        push(@tmp, $cur_id);
+    }
+
+    if (scalar @delete) {
+        @delete = map { id2Path($_); } @delete;
+        # needs more tests, so just print out what would be done
+        execCmd( ('echo', 'rm', '-r', @delete) );
+    }
 }
 
 sub doUpdate {
@@ -304,7 +346,7 @@ sub getBackupList {
     }
 
     @backups = sort {
-    	$a->[0] cmp $b->[0]
+        id2Norm($a->[0]) <=> id2Norm($b->[0])
     } @backups;
 
     return \@backups;
@@ -360,7 +402,7 @@ sub doRestore() {
     	my $id = $_->[0];
     	my $type = $_->[1];
     	
-    	last if ($id gt $target);
+    	last if (id2Norm($id) > id2Norm($target));
     	
     	if ($type eq 'full-backuped') {
     	    @restore_list = ();
@@ -386,6 +428,20 @@ sub restoreFinishUp {
     if (defined($chown)) {
     	execCmd("chown", "-R", $chown, $out);
     }
+}
+
+sub id2Norm {
+    my $id = shift;
+
+    if ( $id =~ m/^(\d{4})-(\d{2})-(\d{2})_(\d{2})-(\d{2})-(\d{2})$/ ) {
+        my $norm = int(sprintf(
+            '%04d%02d%02d%02d%02d%02d' ,
+            $1, $2, $3, $4, $5, $6
+        ));
+        return $norm;
+    }
+        
+    die("id $id not valid!");
 }
 
 sub id2Path {
