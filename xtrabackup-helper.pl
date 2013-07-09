@@ -280,6 +280,14 @@ When making a backup C<innobackupex> is called with the arguments
 
 =over
 
+=item C<--parallel=3>
+
+=item C<--compress>
+
+=item C<--slave-info>
+
+=item C<--safe-slave-backup>
+
 =item C<--rsync>
 
 =item C<--defaults-extra-file=/etc/mysql/debian.cnf>
@@ -288,7 +296,11 @@ When making a backup C<innobackupex> is called with the arguments
 
 =cut
 	
-    my @cmd = ( 'innobackupex', '--rsync', '--defaults-extra-file=/etc/mysql/debian.cnf' );
+    my @cmd = (
+        'innobackupex',
+        '--parallel=3', '--compress',
+        '--slave-info', '--safe-slave-backup', '--rsync', '--defaults-extra-file=/etc/mysql/debian.cnf'
+    );
     if (!$make_full) {
         push(@cmd, '--incremental');
     }

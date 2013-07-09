@@ -86,6 +86,10 @@ HINTS and other STUFF
 
     *   When making a backup "innobackupex" is called with the arguments
 
+        "--parallel=3"
+        "--compress"
+        "--slave-info"
+        "--safe-slave-backup"
         "--rsync"
         "--defaults-extra-file=/etc/mysql/debian.cnf"
 
