@@ -530,15 +530,24 @@ sub restoreFull {
     my $id = shift;
 
     if (scalar <$out/*>) {
-    	if ($force) {
-    	    execCmd("rm", "-r", $out);
-    	} else {
+    	if (!$force) {
     	    die("restore dir $out must be empty");
     	}
     }
 
     my $src = id2Path($id);
-    execCmd("cp", "-a", $src, $out);
+
+    # make sure, the desination has no slash at the path's end
+    $out =~ s@(/+)$@@;
+
+    # make sure, the source has a slash at the path's end
+    $src =~ s@(?<!/)$@/@;
+
+    execCmd(
+        'rsync',
+        '-vrltH', '--delete', '-pgo', '-S', '-D', '--numeric-ids', '-x',
+        $src, $out
+    );
 
     execCmd("innobackupex", "--apply-log", "--redo-only", $out);
 }
