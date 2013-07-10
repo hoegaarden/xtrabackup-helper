@@ -282,8 +282,6 @@ When making a backup C<innobackupex> is called with the arguments
 
 =item C<--parallel=3>
 
-=item C<--compress>
-
 =item C<--slave-info>
 
 =item C<--safe-slave-backup>
@@ -298,7 +296,7 @@ When making a backup C<innobackupex> is called with the arguments
 	
     my @cmd = (
         'innobackupex',
-        '--parallel=3', '--compress',
+        '--parallel=3',
         '--slave-info', '--safe-slave-backup', '--rsync', '--defaults-extra-file=/etc/mysql/debian.cnf'
     );
     if (!$make_full) {
