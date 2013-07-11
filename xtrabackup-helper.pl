@@ -15,6 +15,7 @@ use Getopt::Long;
 use File::Basename;
 use Cwd 'abs_path';
 use File::Temp;
+use POSIX;
 
 use constant TFULL => 'full-backuped';
 use constant TINC => 'incremental';
@@ -158,7 +159,7 @@ is younger is based on that full backup.
 sub handleCmdline {
     GetOptions(
         'mode|m=s'    => \$mode ,
-        'dir=s'       => \$dir ,
+        'dir|d=s'     => \$dir ,
         'restore=s'   => \$restore ,
         'out=s'       => \$out ,
         'chown=s'     => \$chown ,
@@ -256,6 +257,7 @@ sub doUpdate {
 }
 
 sub doBackup {
+    my @backup_list = @{ getBackupList() };
     my $make_full = 0;
     $full_day = $full_day  % 7;
 
@@ -267,7 +269,7 @@ sub doBackup {
     } else {
         my @full = grep {
             $_->[1] eq TFULL
-        } @{ getBackupList() };
+        } @backup_list;
 	
         if (scalar @full < 1) {
             $make_full = 1;
@@ -293,18 +295,26 @@ When making a backup C<innobackupex> is called with the arguments
 =back
 
 =cut
-	
+
+    my $dt_str = POSIX::strftime('%Y-%m-%d_%H-%M-%S', localtime);
+    my $dir_progress = $dir . '/' . 'in_progress__' . $dt_str . '__';
+    my $dir_finished = $dir . '/' . $dt_str;
+
+    my $base_dir = $dir . '/' . $backup_list[-1]->[0];
+
     my @cmd = (
         'innobackupex',
-        '--parallel=3',
-        '--slave-info', '--safe-slave-backup', '--rsync', '--defaults-extra-file=/etc/mysql/debian.cnf'
+        '--parallel', 3, '--no-timestamp',
+        # '--safe-slave-backup' ,
+        '--slave-info', '--rsync', '--defaults-extra-file', '/etc/mysql/debian.cnf'
     );
     if (!$make_full) {
-        push(@cmd, '--incremental');
+        push(@cmd, '--incremental', '--incremental-basedir', $base_dir);
     }
-    push(@cmd, $dir);
+    push(@cmd, $dir_progress);
 
     execCmd(@cmd);
+    execCmd('mv', $dir_progress, $dir_finished);
 }
 
 sub execCmd {
@@ -351,6 +361,8 @@ sub getBackupList {
     # inc_backup <- inc_backup <- ... <- full_backup
     # and we don't prepare a inc_backup on top of a wrong/invalid parent
     #
+
+    my $return_others = shift;
 
     my %heads;
     my @incs;
@@ -425,12 +437,14 @@ sub getBackupList {
         push( @backups , [$_->{id}, $_->{type}] );
     }
 
-    return \@backups ;
+    return $return_others
+        ? ( \@backups, \@others )
+        : \@backups
+    ;
 }
 
 sub doList {
-    my $list = getBackupList();
-    my @others;
+    my ($list, $others) = getBackupList(1);
     my $indent = ' 'x4;
 
     foreach (@$list) {
@@ -447,12 +461,12 @@ sub doList {
     	    next;
     	}
 
-    	push( @others, [ $id, $type ] );
+    	push( @$others, [ $id, $type ] );
     }
 
-    if (scalar @others) {
+    if (scalar @$others) {
     	say "\nOthers:";
-    	foreach (@others) {
+    	foreach (@$others) {
     	    my $id = $_->[0];
     	    my $type = $_->[1];
 
@@ -554,7 +568,11 @@ sub restoreInc {
     my $id = shift;
     my $path = id2Path($id);
 
-    execCmd("innobackupex", "--apply-log", "--redo-only", $out, "--incremental-dir", $path);
+    my $tmp_dir = $path . '/../restore__' . $id;
+
+    execCmd('cp', '-a', $path, $tmp_dir);
+    execCmd("innobackupex", "--apply-log", "--redo-only", $out, "--incremental-dir", $tmp_dir);
+    execCmd('rm', '-r', $tmp_dir);
 }
 
 =back
