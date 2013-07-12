@@ -213,20 +213,17 @@ sub doWeedout {
     my @list = @{ getBackupList() };
 
     my @delete;
-    my $saw_full = 0;
     my @tmp;
 
     while (1) {
         my $cur = shift(@list);
-
         last unless defined($cur);
 
         my $cur_id = $cur->[0];
 
         last if (id2Norm($cur_id) > id2Norm($target));
 
-        if ($cur->[1] eq 'full-backedup') {
-            $saw_full = 1;
+        if ($cur->[1] eq TFULL) {
             push(@delete, @tmp);
             @tmp = ();
         }
@@ -237,7 +234,7 @@ sub doWeedout {
     if (scalar @delete) {
         @delete = map { id2Path($_); } @delete;
         # needs more tests, so just print out what would be done
-        execCmd( ('echo', 'rm', '-r', @delete) );
+        execCmd('rm', '-r', @delete );
     }
 }
 
@@ -318,6 +315,13 @@ When making a backup C<innobackupex> is called with the arguments
 }
 
 sub execCmd {
+    my @caller = caller(1);
+
+    say '#';
+    say '#   [ caller : ' . $caller[3] . ' ]';
+    say '# ' . join(' ', @_);
+    say '#';
+
     system(@_);
     
     if ($? == -1) {
