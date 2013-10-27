@@ -297,8 +297,6 @@ When making a backup C<innobackupex> is called with the arguments
     my $dir_progress = $dir . '/' . 'in_progress__' . $dt_str . '__';
     my $dir_finished = $dir . '/' . $dt_str;
 
-    my $base_dir = $dir . '/' . $backup_list[-1]->[0];
-
     my @cmd = (
         'innobackupex',
         '--parallel', 3, '--no-timestamp',
@@ -306,6 +304,7 @@ When making a backup C<innobackupex> is called with the arguments
         '--slave-info', '--rsync', '--defaults-extra-file', '/etc/mysql/debian.cnf'
     );
     if (!$make_full) {
+        my $base_dir = $dir . '/' . $backup_list[-1]->[0];
         push(@cmd, '--incremental', '--incremental-basedir', $base_dir);
     }
     push(@cmd, $dir_progress);
