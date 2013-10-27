@@ -113,7 +113,7 @@ In which mode to run, see L</MODES>.
 
 =item C<--dir>, C<-d>
 
-The base direcotry of the backuops. It defaults to C</var/backups/mysql/data/>. This dirctory must exist.
+The base directory of the backups. It defaults to C</var/backups/mysql/data/>. This dirctory must exist.
 C<innobackupex> then puts its default directory structure in there, so one ends up with a subdirectory for
 every single backup.
 
@@ -123,7 +123,7 @@ Which backup to restore. Defaults to the most recent one.
 
 =item C<--out>, C<-o>
 
-The directory wher to restore to.
+The directory where to restore to.
 
 =item C<--chown>, C<-c>
 
