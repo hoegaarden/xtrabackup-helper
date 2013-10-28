@@ -47,7 +47,7 @@ OPTIONS
         In which mode to run, see "MODES".
 
     "--dir", "-d"
-        The base direcotry of the backuops. It defaults to
+        The base directory of the backups. It defaults to
         "/var/backups/mysql/data/". This dirctory must exist. "innobackupex"
         then puts its default directory structure in there, so one ends up
         with a subdirectory for every single backup.
@@ -56,7 +56,7 @@ OPTIONS
         Which backup to restore. Defaults to the most recent one.
 
     "--out", "-o"
-        The directory wher to restore to.
+        The directory where to restore to.
 
     "--chown", "-c"
         A user (or uid) and optionaly a group (or gid) to "chmod" all files
@@ -87,7 +87,6 @@ HINTS and other STUFF
     *   When making a backup "innobackupex" is called with the arguments
 
         "--parallel=3"
-        "--compress"
         "--slave-info"
         "--safe-slave-backup"
         "--rsync"
