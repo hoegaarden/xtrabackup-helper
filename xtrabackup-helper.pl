@@ -255,7 +255,7 @@ sub doUpdate {
 
 sub doBackup {
     unless ($full_day >= 1 && $full_day <= 7) {
-        die('full-day must be a between 1 (Monday) and 7 (Sunday)');
+        die('full-day must be an integer between 1 (Monday) and 7 (Sunday)');
     }
 
     my @backup_list = @{ getBackupList() };
