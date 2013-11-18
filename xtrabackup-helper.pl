@@ -259,21 +259,15 @@ sub doBackup {
     }
 
     my @backup_list = @{ getBackupList() };
+    my @full = getFullBackupList(\@backup_list);
     my $make_full = 0;
 
     my $dow = `date '+%u'`;
-    chomp($dow);
+    my $today = `date '+%Y-%m-%d'`;
+    chomp($dow, $today);
 
-    if ($dow eq $full_day) {
+    if (! @full || ($dow eq $full_day && id2Date($full[-1]->[0]) ne $today)) {
         $make_full = 1;
-    } else {
-        my @full = grep {
-            $_->[1] eq TFULL
-        } @backup_list;
-	
-        if (scalar @full < 1) {
-            $make_full = 1;
-        }
     }
 
 =item *
@@ -449,6 +443,15 @@ sub getBackupList {
     ;
 }
 
+sub getFullBackupList {
+    my $backup_list = shift || getBackupList();
+
+    # Extract full backup from backup list.
+    return grep {
+        $_->[1] eq TFULL
+    } @{$backup_list};
+}
+
 sub doList {
     my ($list, $others) = getBackupList(1);
     my $indent = ' 'x4;
@@ -542,6 +545,20 @@ sub id2Norm {
 
 sub id2Path {
     return $dir . '/' . shift;
+}
+
+sub id2Date {
+    my $id = shift;
+
+    if ( $id =~ m/^(\d{4})-(\d{2})-(\d{2})_(\d{2})-(\d{2})-(\d{2})$/ ) {
+        my $date = sprintf(
+            '%04d-%02d-%02d' ,
+            $1, $2, $3
+        );
+        return $date;
+    }
+
+    die("id $id not valid!");
 }
 
 sub restoreFull {
