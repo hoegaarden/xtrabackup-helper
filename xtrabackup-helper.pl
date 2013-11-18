@@ -254,9 +254,12 @@ sub doUpdate {
 }
 
 sub doBackup {
+    unless ($full_day >= 1 && $full_day <= 7) {
+        die('full-day must be an integer between 1 (Monday) and 7 (Sunday)');
+    }
+
     my @backup_list = @{ getBackupList() };
     my $make_full = 0;
-    $full_day = $full_day  % 7;
 
     my $dow = `date '+%u'`;
     chomp($dow);
